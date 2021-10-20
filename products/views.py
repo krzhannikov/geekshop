@@ -1,7 +1,9 @@
+from django.conf import settings
 from django.shortcuts import render
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.views.generic import ListView
 from django.views.generic.detail import DetailView
+from django.core.cache import cache
 
 
 import os
@@ -11,6 +13,32 @@ from products.models import ProductsCategory, Product
 MODULE_DIR = os.path.dirname(__file__)
 
 # Create your views here.
+
+
+def get_links_category():
+    if settings.LOW_CACHE:
+        key = 'links_category'
+        links_category = cache.get(key)
+
+        if links_category is None:
+            links_category = ProductsCategory.objects.filter(is_active=True)
+            cache.set(key, links_category)
+        return links_category
+    else:
+        return ProductsCategory.objects.filter(is_active=True)
+
+
+def get_links_product():
+    if settings.LOW_CACHE:
+        key = 'links_product'
+        links_product = cache.get(key)
+
+        if links_product is None:
+            links_product = Product.objects.filter(is_active=True).select_related()
+            cache.set(key, links_product)
+        return links_product
+    else:
+        return Product.objects.filter(is_active=True).select_related()
 
 
 def index(request):
@@ -45,7 +73,8 @@ class ProductsListView(ListView):
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super(ProductsListView, self).get_context_data(**kwargs)
         context['title'] = 'Каталог'
-        context['category'] = ProductsCategory.objects.all()
+        context['category'] = get_links_category()
+        # context['category'] = ProductsCategory.objects.all()
         # context['products'] = self.products_paginator(self)
         return context
 
