@@ -1,6 +1,7 @@
 from django.conf import settings
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.views.decorators.cache import cache_page
 from django.views.generic import ListView
 from django.views.generic.detail import DetailView
 from django.core.cache import cache
@@ -28,6 +29,19 @@ def get_links_category():
         return ProductsCategory.objects.filter(is_active=True)
 
 
+def get_product(pk):
+    if settings.LOW_CACHE:
+        key = f'product{pk}'
+        product = cache.get(key)
+
+        if product is None:
+            product = get_object_or_404(Product, pk=pk)
+            cache.set(key, product)
+        return product
+    else:
+        return get_object_or_404(Product, pk=pk)
+
+
 def get_links_product():
     if settings.LOW_CACHE:
         key = 'links_product'
@@ -53,6 +67,7 @@ class ProductDetailView(DetailView):
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super(ProductDetailView, self).get_context_data(**kwargs)
         context['title'] = 'Подробно о товаре'
+        context['product'] = get_product(self.kwargs.get('pk'))
         return context
 
 
@@ -70,6 +85,7 @@ class ProductsListView(ListView):
     template_name = 'products.html'
     paginate_by = 3
 
+    @cache_page(3600)
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super(ProductsListView, self).get_context_data(**kwargs)
         context['title'] = 'Каталог'
